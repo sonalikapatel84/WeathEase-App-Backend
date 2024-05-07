@@ -1,134 +1,53 @@
 package com.weatherapi.controller;
 
-import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
+import com.weatherapi.dao.ForecastData;
+import com.weatherapi.dao.WeatherData;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.web.servlet.error.ErrorController;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import com.weatherapi.countrycodes.CountryCodes;
-import com.weatherapi.model.FiveDayHourlyWeather;
-import com.weatherapi.model.Weather;
 import com.weatherapi.service.WeatherService;
+import org.springframework.web.bind.annotation.RestController;
 
-@Controller
-@RequestMapping("/")
-public class WeatherAPIController implements ErrorController{
-	
-	private static final String ERROR_PATH = "/error";
-	
+@RestController
+@RequestMapping("/api")
+public class WeatherAPIController{
+
 	@Autowired
 	WeatherService wService;
-	
-	private List<String> days;
-	private List<List<FiveDayHourlyWeather>> weatherData;
-	
-	@RequestMapping(value = ERROR_PATH)
-	public String errorPage(Model model) {
-		
-		CountryCodes codes = new CountryCodes();
-		
-		model.addAttribute("codes", codes.getAllCountryCodes());
-		
-		return "weather_view";
-		
-	}
-	
-	@Override
-	public String getErrorPath() {
-		return ERROR_PATH;
-	}
-	
-	//Sets the search page and loads the ISO codes table.
-	@RequestMapping("/")
-	public String getWeatherView(Model model, CountryCodes codes) {
-		
-		model.addAttribute("codes", codes.getAllCountryCodes());
-		
-		return "weather_view";
-		
-	}
-	
-	//Allows you to search for weather in city + country (ISO) or just city alone.
+
+
+	// An endpoint that provides the current weather based on city
 	@GetMapping("/current/weather")
-	public String getCurrentWeatherDataForCityAndCountry(
-			@RequestParam("city") String city, 
-			@RequestParam("country") String country, 
-			Model model) throws IOException {
-		
-		Weather weather;
-		weather = this.wService.getWeatherDataCity(city, country);
-		
-		if(weather != null) {
-			model.addAttribute("weather", weather);
-			return "weather_for_city";
-		}else {
-			CountryCodes codes = new CountryCodes();
-			model.addAttribute("error", true);
-			model.addAttribute("codes", codes.getAllCountryCodes());
-			return "weather_view";
-		}
-		
-	}
-	
-	@GetMapping("/five_day/weather")
-	public String getFiveDayForecast(
-			@RequestParam("city") String city, 
-			@RequestParam("country") String country, 
-			Model model) throws IOException {
-		
-		city = city.substring(0, 1).toUpperCase() + city.substring(1);
-		
-		Map<String, List<FiveDayHourlyWeather>> fiveDay = this.wService.getHourlyWeather(city, country);
-		
-		if(!fiveDay.isEmpty()) {
-			getDays(fiveDay);
-			getDataForEachDay(fiveDay);
-			model.addAttribute("city", city);
-			model.addAttribute("days", this.days);
-			model.addAttribute("weather_data", this.weatherData);
-			
-			return "five_day_forecast";
-		}else {
-			CountryCodes codes = new CountryCodes();
-			model.addAttribute("error", true);
-			model.addAttribute("codes", codes.getAllCountryCodes());
-			
-			return "weather_view";
-		}
-		
-	}
-	
-	public void getDays(Map<String, List<FiveDayHourlyWeather>> fiveDay) {
-		
-		this.days = new ArrayList<>();
-		
-		for(String day : fiveDay.keySet()) {
-			
-			this.days.add(day);
-			
-		}
-		
-	}
-	
-	public void getDataForEachDay(Map<String, List<FiveDayHourlyWeather>> fiveDay) {
-		
-		this.weatherData = new ArrayList<>();
-		
-		for(String list : fiveDay.keySet()) {
-			
-			this.weatherData.add(fiveDay.get(list));
-			
-		}
+	public ResponseEntity<WeatherData> getCurrentWeatherDataForCity(
+			@RequestParam("city") String city) {
+
+		// Your implementation which fetches the weather data for given city
+		// and put that data into a WeatherData object
+		WeatherData weatherData = wService.getWeatherDataForCoordinates(
+                wService.getCoordinatesForCity(city).getLat(),
+                wService.getCoordinatesForCity(city).getLon());
+
+		// return the weatherData object as a response entity with status OK
+		return ResponseEntity.ok(weatherData);
 		
 	}
 
+	@GetMapping("/fourDayForecast")
+	public ResponseEntity<List<ForecastData>> getFourDayForecast(
+			@RequestParam("city") String city) {
 
+		// Your implementation which fetches the forecast data for given city
+		// and put that data into a List of ForecastData objects
+		List<ForecastData> forecastDataList = wService.getFourDayForecast(
+				wService.getCoordinatesForCity(city).getLat(),
+				wService.getCoordinatesForCity(city).getLon());
+
+		// return the forecastDataList object as a response entity with status OK
+		return ResponseEntity.ok(forecastDataList);
+	}
 }

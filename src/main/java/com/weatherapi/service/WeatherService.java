@@ -1,16 +1,30 @@
 package com.weatherapi.service;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
+import com.weatherapi.dao.CoordinatesData;
+import com.weatherapi.dao.WeatherData;
+import com.weatherapi.dao.ForecastData;
 
-import com.weatherapi.model.FiveDayHourlyWeather;
-import com.weatherapi.model.Weather;
+import java.util.List;
 
 public interface WeatherService {
-	
-	public Weather getWeatherDataCity(String city, String country) throws IOException;
-	
-	public Map<String, List<FiveDayHourlyWeather>> getHourlyWeather(String city, String country) throws IOException;
 
+	/**
+	 * @param city
+	 * @return
+	 */
+	CoordinatesData getCoordinatesForCity(String city);
+
+	/**
+	 * @param lat
+	 * @param lon
+	 * @return
+	 */
+	WeatherData getWeatherDataForCoordinates(double lat, double lon);
+
+	/**
+	 * @param lat
+	 * @param lon
+	 * @return
+	 */
+	List<ForecastData> getFourDayForecast(double lat, double lon);
 }

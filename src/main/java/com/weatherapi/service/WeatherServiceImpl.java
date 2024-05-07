@@ -1,175 +1,197 @@
 package com.weatherapi.service;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.LinkedHashMap;
+import java.net.URI;
+import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.joda.time.DateTime;
-import org.json.JSONObject;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.weatherapi.dao.CoordinatesData;
+import com.weatherapi.dao.ForecastData;
+import com.weatherapi.dao.WeatherData;
+
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import com.weatherapi.countrycodes.CountryCodes;
-import com.weatherapi.dao.WeatherDAO;
-import com.weatherapi.model.FiveDayHourlyWeather;
-import com.weatherapi.model.Weather;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 public class WeatherServiceImpl implements WeatherService{
-	
-	@Autowired
-	WeatherDAO wDAO;
-	
-	private String json;
-	private Weather weather;
-	private Map<String, List<FiveDayHourlyWeather>> weatherForFiveDays;
 
-	@Override
-	public Weather getWeatherDataCity(String city, String country) throws IOException {
-		
-		return jsonParseCityWeather(city, country);
-		
-	}
-	
-	//Retrieves weather data in JSON format and assigns it to a String variable.
-	private Weather jsonParseCityWeather(String city, String country) throws IOException {
-		
-		this.json = this.wDAO.getWeatherDataCity(city, country);
-		setWeatherParameters();
-		
-		return this.weather;
-		
-	}
-	
-	//Parses the JSONObject and retrieves the weather data.
-	private void setWeatherParameters() {
-		
+	private static final String API_KEY = "5a90dbea461838b9770353a1eaad376b";
+	private static final String ISO3166_COUNTRY_CODE = "AU";
+	private static final String BASE_URL = "http://api.openweathermap.org/geo/1.0/direct";
+
+    public WeatherServiceImpl(RestTemplate restTemplate) {
+    }
+
+    @Override
+	public CoordinatesData getCoordinatesForCity(String city) {
+		URI uri = UriComponentsBuilder.fromHttpUrl(BASE_URL)
+				.queryParam("q", city + "," + ISO3166_COUNTRY_CODE)
+				.queryParam("appid", API_KEY)
+				.build()
+				.toUri();
+
+
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<CoordinatesData> responseEntity = restTemplate.getForEntity(uri,
+				CoordinatesData.class);
+		ObjectMapper mapper = new ObjectMapper();
+
 		try {
-			//Parsing JSON object and retrieving relevant information.
-			JSONObject obj = new JSONObject(this.json);
-			
-			String name = obj.getString("name").toString();
-			String country = obj.getJSONObject("sys").getString("country");
-			double humidity = obj.getJSONObject("main").getInt("humidity");
-			double pressure = obj.getJSONObject("main").getInt("pressure");
-			double temperature = obj.getJSONObject("main").getDouble("temp");
-			double tempFeelsLike = obj.getJSONObject("main").getDouble("feels_like");
-			double tempMax = obj.getJSONObject("main").getDouble("temp_max");
-			double tempMin = obj.getJSONObject("main").getDouble("temp_min");
-			double timeZone = obj.getDouble("timezone");
-			String weather = obj.getJSONArray("weather").getJSONObject(0).getString("main");
-			String weatherDesc = obj.getJSONArray("weather").getJSONObject(0).getString("description");
-			
-			//Creating the Weather object
-			this.weather = new Weather();
-			
-			//Setting the Weather object
-			this.weather.setCity(name);
-			this.weather.setCountry(new CountryCodes().getCountry(country));
-			this.weather.setCountryISOCode(country);
-			this.weather.setHumidity(humidity);
-			this.weather.setPressure(pressure);
-			this.weather.setTemperature(temperature);
-			this.weather.setTempFeelsLike(tempFeelsLike);
-			this.weather.setTempMax(tempMax);
-			this.weather.setTempMin(tempMin);
-			this.weather.setTimeZone(timeZone);
-			this.weather.setWeather(weather);
-			this.weather.setWeatherDesc(weatherDesc);
-			
-		}catch(Exception e) {
+			JsonNode root = mapper.readTree(responseEntity.getBody().toString());
+			JsonNode firstElement = root.get(0); // because the api returns a json array
+			double lat = firstElement.path("lat").asDouble();
+			double lon = firstElement.path("lon").asDouble();
+
+			CoordinatesData coordinates = new CoordinatesData();
+			coordinates.setLat(lat);
+			coordinates.setLon(lon);
+
+			return coordinates;
+		} catch (Exception e) {
+			// Handle exception here
 			e.printStackTrace();
 		}
-		
-	}
-	
-	@Override
-	public Map<String, List<FiveDayHourlyWeather>> getHourlyWeather(String city, String country) throws IOException {
-		
-		return jsonParseHourlyWeather(city, country);
-		
-	}
-	
-	private Map<String, List<FiveDayHourlyWeather>> jsonParseHourlyWeather(String city, String country) throws IOException {
-		
-		this.json = this.wDAO.getHourlyWeatherData(city, country);
-		setHourlyWeatherParameters();
-		
-		return this.weatherForFiveDays;
-		
-	}
-	
-	private void setHourlyWeatherParameters() {
-		
-		try {
-			
-			List<FiveDayHourlyWeather> weatherPerThreeHoursPerDay = new ArrayList<>();
-			this.weatherForFiveDays = new LinkedHashMap<>();
-			FiveDayHourlyWeather hourlyWeather;
-			JSONObject obj = new JSONObject(this.json);
-			DateTime dt = new DateTime(new Date());
-			DateTime.Property dtp = dt.dayOfWeek();
-			String day = dtp.getAsText();
-			
-			int count = 0;
-			
-			for(int i = 0; i < obj.getJSONArray("list").length(); i++) {
-				
-				hourlyWeather = new FiveDayHourlyWeather();
-				
-				String time = obj.getJSONArray("list").getJSONObject(i).getString("dt_txt").split(" ")[1];
-				double humidity = obj.getJSONArray("list").getJSONObject(i).getJSONObject("main").getInt("humidity");
-				double pressure = obj.getJSONArray("list").getJSONObject(i).getJSONObject("main").getInt("pressure");
-				double temperature = obj.getJSONArray("list").getJSONObject(i).getJSONObject("main").getDouble("temp");
-				double tempMax = obj.getJSONArray("list").getJSONObject(i).getJSONObject("main").getDouble("temp_max");
-				double tempMin = obj.getJSONArray("list").getJSONObject(i).getJSONObject("main").getDouble("temp_min");
-				String weather = obj.getJSONArray("list").getJSONObject(i).getJSONArray("weather").getJSONObject(0).getString("main");
-				String weatherDesc = obj.getJSONArray("list").getJSONObject(i).getJSONArray("weather").getJSONObject(0).getString("description");
-				
-				hourlyWeather.setDay(day);
-				hourlyWeather.setCity(getCity(obj));
-				hourlyWeather.setCountry(new CountryCodes().getCountry(getCountry(obj)));
-				hourlyWeather.setCountryISOCode(getCountry(obj));
-				hourlyWeather.setTime(time);
-				hourlyWeather.setHumidity(humidity);
-				hourlyWeather.setPressure(pressure);
-				hourlyWeather.setTemperature(temperature);
-				hourlyWeather.setTempMax(tempMax);
-				hourlyWeather.setTempMin(tempMin);
-				hourlyWeather.setWeather(weather);
-				hourlyWeather.setWeatherDesc(weatherDesc);
-				
-				weatherPerThreeHoursPerDay.add(hourlyWeather);
-				
-				if(time.equals("21:00:00")) {
-					this.weatherForFiveDays.put(day.toString(), weatherPerThreeHoursPerDay);
-					count++;
-					dtp = dt.plusDays(count).dayOfWeek();
-					day = dtp.getAsText();
-					weatherPerThreeHoursPerDay = new ArrayList<>();
-				}
-		
-			}
-			
-		}catch(Exception e) {
-			e.printStackTrace();
-		}
-		
-	}
-	
-	private String getCity(JSONObject obj) {
-		String name = obj.getJSONObject("city").getString("name");
-		
-		return name;
-	}
-	
-	private String getCountry(JSONObject obj) {
-		String country = obj.getJSONObject("city").getString("country");
-		
-		return country;
+
+		return null; // This line should not be reached if the API response is well formed
 	}
 
+	@Override
+	public WeatherData getWeatherDataForCoordinates(double lat, double lon) {
+
+
+        String forecastBaseUrl = "https://api.openweathermap.org/data/2.5/forecast";
+        URI uri = UriComponentsBuilder.fromHttpUrl(forecastBaseUrl)
+                .queryParam("lat", lat)
+                .queryParam("lon", lon)
+                .queryParam("appid", API_KEY)
+                .build()
+                .toUri();
+
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<String> responseEntity = restTemplate.getForEntity(uri, String.class);
+
+        if (responseEntity.getStatusCode().is2xxSuccessful()) {
+            // handle successful response here with responseEntity.getBody()
+			// Build the weatherdata object here
+
+            ObjectMapper mapper = new ObjectMapper();
+
+            try {
+                // Parse JSON response
+                JsonNode root = mapper.readTree(responseEntity.getBody());
+
+                // Define placeholder field names - modify these as necessary
+                String tempField = "placeholderField";
+                String feelsLikeField = "placeholderField";
+                String rainField = "placeholderField";
+                String cloudField = "placeholderField";
+                String humidityField = "placeholderField";
+                String pressureField = "placeholderField";
+                String tempMinField = "placeholderField";
+                String tempMaxField = "placeholderField";
+
+                // Fetch data from JSON
+                Double temp = root.path(tempField).asDouble();
+                Double feelsLike = root.path(feelsLikeField).asDouble();
+                Double rain = root.path(rainField).asDouble();
+                String cloud = root.path(cloudField).asText();
+                Double humidity = root.path(humidityField).asDouble();
+                Double pressure = root.path(pressureField).asDouble();
+                Double tempMin = root.path(tempMinField).asDouble();
+                Double tempMax = root.path(tempMaxField).asDouble();
+
+                // Create WeatherData object and set properties
+                WeatherData weatherData = new WeatherData();
+                weatherData.setTemp(temp);
+                weatherData.setFeelsLike(feelsLike);
+                weatherData.setRain(rain);
+                weatherData.setCloud(cloud);
+                weatherData.setHumidity(humidity);
+                weatherData.setPressure(pressure);
+                weatherData.setTempMin(tempMin);
+                weatherData.setTempMax(tempMax);
+
+                return weatherData;
+            } catch (Exception e) {
+                // Handle exception here
+                e.printStackTrace();
+            }
+        } else {
+            // handle error here
+            System.out.println("There is an error in the data.");
+        }
+		return null;
+	}
+
+	@Override
+	public List<ForecastData> getFourDayForecast(double lat, double lon) {
+
+        URI uri = UriComponentsBuilder.fromHttpUrl("https://api.openweathermap.org/data/2.5/forecast")
+                .queryParam("lat", lat)
+                .queryParam("lon", lon)
+                .queryParam("appid", API_KEY)
+                .build()
+                .toUri();
+
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<String> responseEntity = restTemplate.getForEntity(uri, String.class);
+
+        if (responseEntity.getStatusCode().is2xxSuccessful()) {
+            ObjectMapper mapper = new ObjectMapper();
+
+            try {
+                // Parse JSON response
+                JsonNode root = mapper.readTree(responseEntity.getBody());
+
+                // Extract 'list' from JSON which contains forecast data
+                JsonNode listNode = root.path("list");
+
+                // Loop through each forecast element in 'list'
+                Map<LocalDate, WeatherData> forecastMap = new HashMap<>();
+                for (JsonNode forecastNode : listNode) {
+                    // Fetch data from JSON
+                    Double temp = forecastNode.path("main").path("temp").asDouble();
+                    Double feelsLike = forecastNode.path("main").path("feels_like").asDouble();
+                    Double pressure = forecastNode.path("main").path("pressure").asDouble();
+                    Double humidity = forecastNode.path("main").path("humidity").asDouble();
+                    Double tempMin = forecastNode.path("main").path("temp_min").asDouble();
+                    Double tempMax = forecastNode.path("main").path("temp_max").asDouble();
+                    String cloud = forecastNode.path("weather").get(0).path("description").asText();
+
+                    // Create WeatherData object and set properties
+                    WeatherData weatherData = new WeatherData();
+                    weatherData.setTemp(temp);
+                    weatherData.setFeelsLike(feelsLike);
+                    weatherData.setPressure(pressure);
+                    weatherData.setHumidity(humidity);
+                    weatherData.setTempMin(tempMin);
+                    weatherData.setTempMax(tempMax);
+                    weatherData.setCloud(cloud);
+
+                    // Get the date from 'dt_txt' field in 'list' array
+                    String dateTime = forecastNode.path("dt_txt").asText();  // This is in format "2021-11-28 15:00:00"
+                    LocalDate date = LocalDate.parse(dateTime.split(" ")[0]);  // Get only date part.
+
+                    // Add to forecastMap
+                    forecastMap.put(date, weatherData);
+                }
+
+                // Create ForecastData object and set properties
+                ForecastData forecastData = new ForecastData();
+                forecastData.setWeatherData(forecastMap);
+
+                return List.of(forecastData);
+            } catch (Exception e) {
+                // Handle exception here
+                e.printStackTrace();
+            }
+        }
+        return List.of();
+	}
 }
