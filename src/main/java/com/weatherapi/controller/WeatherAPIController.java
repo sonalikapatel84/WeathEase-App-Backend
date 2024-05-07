@@ -28,9 +28,7 @@ public class WeatherAPIController{
 
 		// Your implementation which fetches the weather data for given city
 		// and put that data into a WeatherData object
-		WeatherData weatherData = wService.getWeatherDataForCoordinates(
-                wService.getCoordinatesForCity(city).getLat(),
-                wService.getCoordinatesForCity(city).getLon());
+		WeatherData weatherData = wService.getWeatherDataForCity(city);
 
 		// return the weatherData object as a response entity with status OK
 		return ResponseEntity.ok(weatherData);
@@ -43,9 +41,7 @@ public class WeatherAPIController{
 
 		// Your implementation which fetches the forecast data for given city
 		// and put that data into a List of ForecastData objects
-		List<ForecastData> forecastDataList = wService.getFourDayForecast(
-				wService.getCoordinatesForCity(city).getLat(),
-				wService.getCoordinatesForCity(city).getLon());
+		List<ForecastData> forecastDataList = wService.getFourDayForecast(city);
 
 		// return the forecastDataList object as a response entity with status OK
 		return ResponseEntity.ok(forecastDataList);

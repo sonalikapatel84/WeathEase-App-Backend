@@ -22,53 +22,12 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class WeatherServiceImpl implements WeatherService{
 
 	private static final String API_KEY = "5a90dbea461838b9770353a1eaad376b";
-	private static final String ISO3166_COUNTRY_CODE = "AU";
-	private static final String BASE_URL = "http://api.openweathermap.org/geo/1.0/direct";
-
-    public WeatherServiceImpl(RestTemplate restTemplate) {
-    }
-
-    @Override
-	public CoordinatesData getCoordinatesForCity(String city) {
-		URI uri = UriComponentsBuilder.fromHttpUrl(BASE_URL)
-				.queryParam("q", city + "," + ISO3166_COUNTRY_CODE)
-				.queryParam("appid", API_KEY)
-				.build()
-				.toUri();
-
-
-        RestTemplate restTemplate = new RestTemplate();
-        ResponseEntity<CoordinatesData> responseEntity = restTemplate.getForEntity(uri,
-				CoordinatesData.class);
-		ObjectMapper mapper = new ObjectMapper();
-
-		try {
-			JsonNode root = mapper.readTree(responseEntity.getBody().toString());
-			JsonNode firstElement = root.get(0); // because the api returns a json array
-			double lat = firstElement.path("lat").asDouble();
-			double lon = firstElement.path("lon").asDouble();
-
-			CoordinatesData coordinates = new CoordinatesData();
-			coordinates.setLat(lat);
-			coordinates.setLon(lon);
-
-			return coordinates;
-		} catch (Exception e) {
-			// Handle exception here
-			e.printStackTrace();
-		}
-
-		return null; // This line should not be reached if the API response is well formed
-	}
 
 	@Override
-	public WeatherData getWeatherDataForCoordinates(double lat, double lon) {
-
-
-        String forecastBaseUrl = "https://api.openweathermap.org/data/2.5/forecast";
+	public WeatherData getWeatherDataForCity(String city) {
+        String forecastBaseUrl = "https://api.openweathermap.org/data/2.5/weather";
         URI uri = UriComponentsBuilder.fromHttpUrl(forecastBaseUrl)
-                .queryParam("lat", lat)
-                .queryParam("lon", lon)
+                .queryParam("cityName", city)
                 .queryParam("appid", API_KEY)
                 .build()
                 .toUri();
@@ -77,9 +36,6 @@ public class WeatherServiceImpl implements WeatherService{
         ResponseEntity<String> responseEntity = restTemplate.getForEntity(uri, String.class);
 
         if (responseEntity.getStatusCode().is2xxSuccessful()) {
-            // handle successful response here with responseEntity.getBody()
-			// Build the weatherdata object here
-
             ObjectMapper mapper = new ObjectMapper();
 
             try {
@@ -130,11 +86,10 @@ public class WeatherServiceImpl implements WeatherService{
 	}
 
 	@Override
-	public List<ForecastData> getFourDayForecast(double lat, double lon) {
+	public List<ForecastData> getFourDayForecast(String city) {
 
-        URI uri = UriComponentsBuilder.fromHttpUrl("https://api.openweathermap.org/data/2.5/forecast")
-                .queryParam("lat", lat)
-                .queryParam("lon", lon)
+        URI uri = UriComponentsBuilder.fromHttpUrl("https://pro.openweathermap.org/data/2.5/forecast/hourly")
+                .queryParam("cityName", city)
                 .queryParam("appid", API_KEY)
                 .build()
                 .toUri();

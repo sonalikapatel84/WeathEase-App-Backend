@@ -8,23 +8,17 @@ import java.util.List;
 
 public interface WeatherService {
 
+
+
 	/**
 	 * @param city
 	 * @return
 	 */
-	CoordinatesData getCoordinatesForCity(String city);
+	WeatherData getWeatherDataForCity(String city);
 
 	/**
-	 * @param lat
-	 * @param lon
+	 * @param city
 	 * @return
 	 */
-	WeatherData getWeatherDataForCoordinates(double lat, double lon);
-
-	/**
-	 * @param lat
-	 * @param lon
-	 * @return
-	 */
-	List<ForecastData> getFourDayForecast(double lat, double lon);
+	List<ForecastData> getFourDayForecast(String city);
 }
